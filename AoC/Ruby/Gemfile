@@ -1,6 +1,21 @@
 source "https://rubygems.org"
 
+ruby ">= 2.6.0"
+
 git_source(:github) {|repo_name| "https://github.com/#{repo_name}" }
+
+gem "gemfilelint"
+gem "ruby-lsp"
+gem "pry"
+gem "pry-byebug"
+gem "sorbet-static-and-runtime"
+gem "rubocop"
+gem "rubocop-performance"
+gem "rubocop-rspec"
+gem "rubocop-sorbet"
+gem "syntax_tree"
+gem "tapioca"
+gem "rspec"
 
 # Specify your gem's dependencies in AoC.gemspec
 gemspec
