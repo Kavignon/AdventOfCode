@@ -23,4 +23,4 @@ module CalibrationDocument
   end
 end
 
-CalibrationDocument.get_calibration_value('input/2023/day_1_part_1.txt')
+CalibrationDocument.get_calibration_value('input/2023/day_1.txt')
