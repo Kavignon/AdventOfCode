@@ -1,8 +1,36 @@
-# Default ignored files
-/shelf/
-/workspace.xml
-# Editor-based HTTP Client requests
-/httpRequests/
-# Datasource local storage ignored files
-/dataSources/
-/dataSources.local.xml
+# RubyMine
+.idea/**/*
+*.iml
+
+# macOS
+.DS_Store
+
+# Gems
+/vendor/bundle/
+
+# Temporary files
+*.swp
+*~
+
+# Coverage data
+/coverage/
+
+# Dependency directories
+/bin/
+/gems/
+/ruby/
+/libexec/
+
+# Logs
+/log/
+*.log
+
+# Compiled Ruby extension
+*.so
+
+# Environment configuration
+.env
+
+# RubyMine project files
+/.ruby-version
+/.ruby-gemset
