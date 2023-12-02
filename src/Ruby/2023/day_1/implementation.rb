@@ -1,3 +1,6 @@
+# frozen_string_literal: true
+# typed: true
+
 module CalibrationDocument
   NUMBER_WORDS = {
     'one' => 1,
@@ -9,7 +12,7 @@ module CalibrationDocument
     'seven' => 7,
     'eight' => 8,
     'nine' => 9
-  }
+  }.freeze
 
   def self.get_file_calibration_sum(file_path)
     return puts("File not found: #{file_path}") unless File.exist?(file_path)
@@ -20,42 +23,44 @@ module CalibrationDocument
       .sum
   end
 
-  private
-
   def self.compute_calibration(calibration_line)
     return 0 if calibration_line.nil? || calibration_line.empty?
 
     readings = extract_digits_from_line(calibration_line)
-    first, last = readings.first, readings.last
+    first = readings.first
+    last = readings.last
 
-    val =
-      if first && last
-        (first.to_i * 10) + last.to_i
-      elsif last.nil?
-        (first.to_i * 10) + first.to_i
-      else
-        0
-      end
-    val
+    if first && last
+      (first.to_i * 10) + last.to_i
+    elsif last.nil?
+      (first.to_i * 10) + first.to_i
+    else
+      0
+    end
   end
 
   def self.collect_reading(line)
     digits_found_in_line = extract_digits_and_indexes(line)
     numbers_found_in_line = extract_digits_from_line(line)
 
-    first_digit = digits_found_in_line.find { |digit1| numbers_found_in_line.any? { |digit2| digit1[:index] < digit2[:index] } }
-    last_digit = digits_found_in_line.reverse.find { |digit1| numbers_found_in_line.any? { |digit2| digit1[:index] > digit2[:index] } }
-
-    val =
-      if first_digit && last_digit
-        (first_digit[:digit].to_i * 10) + last_digit[:digit].to_i
-      elsif last_digit.nil?
-        (first_digit[:digit].to_i * 10) + first_digit[:digit].to_i
-      else
-        0
+    first_digit = digits_found_in_line.find do |digit1|
+      numbers_found_in_line.any? do |digit2|
+        digit1[:index] < digit2[:index]
       end
+    end
+    last_digit = digits_found_in_line.reverse.find do |digit1|
+      numbers_found_in_line.any? do |digit2|
+        digit1[:index] > digit2[:index]
+      end
+    end
 
-    val
+    if first_digit && last_digit
+      (first_digit[:digit].to_i * 10) + last_digit[:digit].to_i
+    elsif last_digit.nil?
+      (first_digit[:digit].to_i * 10) + first_digit[:digit].to_i
+    else
+      0
+    end
   end
 
   def self.extract_digits_and_indexes(line)
@@ -65,9 +70,7 @@ module CalibrationDocument
     while i < line.length
       char = line[i]
 
-      if ('0'..'9').cover?(char)
-        readings.push({ index: i, digit: char.to_i })
-      end
+      readings.push({ index: i, digit: char.to_i }) if ('0'..'9').cover?(char)
 
       i += 1
     end

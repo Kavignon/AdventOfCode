@@ -1,9 +1,15 @@
+# frozen_string_literal: true
+
 # Gemfile
 
 source 'https://rubygems.org'
 
 # Sorbet gem
 gem 'sorbet', require: false
+
+group :development, :test do
+  gem 'tapioca', require: false
+end
 
 # RuboCop for style checking
 gem 'rubocop', require: false
