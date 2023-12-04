@@ -1,19 +1,49 @@
 # frozen_string_literal: true
-# typed: true
+# typed: false
 
+# Represents a measurement in a calibration document.
+class CalibrationReading
+  extend T::Sig
+  extend T::Generic
+
+  Elem = type_member
+
+  sig { params(index: Integer, digit: Elem).void }
+  def initialize(index, digit)
+    @index = index
+    @digit = digit
+  end
+
+  sig { returns(Integer) }
+  attr_reader :index
+
+  sig { returns(Elem) }
+  attr_reader :digit
+end
+
+# This module is responsible for handling the computation for the calibration system of the launcher.
+# This serves to resolve the problem set by the Advent of Code 2023 day 1.
 module CalibrationDocument
-  NUMBER_WORDS = {
-    'one' => 1,
-    'two' => 2,
-    'three' => 3,
-    'four' => 4,
-    'five' => 5,
-    'six' => 6,
-    'seven' => 7,
-    'eight' => 8,
-    'nine' => 9
-  }.freeze
+  extend T::Sig
 
+  NUMBER_WORDS = T.let(
+    {
+      'one' => 1,
+      'two' => 2,
+      'three' => 3,
+      'four' => 4,
+      'five' => 5,
+      'six' => 6,
+      'seven' => 7,
+      'eight' => 8,
+      'nine' => 9
+    }.freeze,
+    T::Hash[String, Integer]
+  )
+
+  DIGITS_RANGE = T.let((0..9).freeze, T::Range[Integer])
+
+  sig { params(file_path: String).returns(Integer) }
   def self.get_file_calibration_sum(file_path)
     return puts("File not found: #{file_path}") unless File.exist?(file_path)
 
@@ -23,22 +53,24 @@ module CalibrationDocument
       .sum
   end
 
+  sig { params(calibration_line: String).returns(Integer) }
   def self.compute_calibration(calibration_line)
     return 0 if calibration_line.nil? || calibration_line.empty?
 
     readings = extract_digits_from_line(calibration_line)
-    first = readings.first
-    last = readings.last
 
-    if first && last
-      (first.to_i * 10) + last.to_i
-    elsif last.nil?
-      (first.to_i * 10) + first.to_i
+    return 0 unless readings
+
+    if readings.first && readings.last
+      (readings.first.to_i * 10) + readings.last.to_i
+    elsif readings.last.nil?
+      (readings.first.to_i * 10) + readings.last.to_i
     else
       0
     end
   end
 
+  sig { params(line: String).returns(Integer) }
   def self.collect_reading(line)
     digits_found_in_line = extract_digits_and_indexes(line)
     numbers_found_in_line = extract_digits_from_line(line)
@@ -63,6 +95,7 @@ module CalibrationDocument
     end
   end
 
+  sig { params(line: String).returns(T::Array[CalibrationReading[T.untyped]]) }
   def self.extract_digits_and_indexes(line)
     readings = []
 
@@ -78,6 +111,7 @@ module CalibrationDocument
     readings
   end
 
+  sig { params(line: String).returns(T::Array[CalibrationReading[T.untyped]]) }
   def self.extract_digits_from_line(line)
     readings = []
 
@@ -98,6 +132,7 @@ module CalibrationDocument
     readings
   end
 
+  sig { params(spelled_out_number: String).returns(T.nilable(Integer)) }
   def self.convert_spelled_out_number(spelled_out_number)
     NUMBER_WORDS[spelled_out_number.downcase]
   end
