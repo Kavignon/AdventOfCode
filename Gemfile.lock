@@ -51,6 +51,9 @@ GEM
       sorbet-static (= 0.5.10461)
     sorbet-runtime (0.5.10461)
     sorbet-static (0.5.10461-universal-darwin-22)
+    sorbet-static-and-runtime (0.5.10461)
+      sorbet (= 0.5.10461)
+      sorbet-runtime (= 0.5.10461)
     spoom (1.1.11)
       sorbet (>= 0.5.9204)
       sorbet-runtime (>= 0.5.9204)
@@ -83,8 +86,7 @@ DEPENDENCIES
   rubocop-performance
   rubocop-rspec
   rubocop-sorbet
-  sorbet
-  sorbet-runtime
+  sorbet-static-and-runtime
   tapioca
 
 BUNDLED WITH
