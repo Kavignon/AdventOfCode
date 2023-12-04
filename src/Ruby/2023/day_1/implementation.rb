@@ -1,14 +1,11 @@
 # frozen_string_literal: true
-# typed: false
+# typed: true
 
 # Represents a measurement in a calibration document.
 class CalibrationReading
   extend T::Sig
-  extend T::Generic
 
-  Elem = type_member
-
-  sig { params(index: Integer, digit: Elem).void }
+  sig { params(index: Integer, digit: Integer).void }
   def initialize(index, digit)
     @index = index
     @digit = digit
@@ -17,7 +14,7 @@ class CalibrationReading
   sig { returns(Integer) }
   attr_reader :index
 
-  sig { returns(Elem) }
+  sig { returns(Integer) }
   attr_reader :digit
 end
 
@@ -45,7 +42,10 @@ module CalibrationDocument
 
   sig { params(file_path: String).returns(Integer) }
   def self.get_file_calibration_sum(file_path)
-    return puts("File not found: #{file_path}") unless File.exist?(file_path)
+    unless File.exist?(file_path)
+      puts("File not found: #{file_path}")
+      0
+    end
 
     IO
       .foreach(file_path)
@@ -55,19 +55,14 @@ module CalibrationDocument
 
   sig { params(calibration_line: String).returns(Integer) }
   def self.compute_calibration(calibration_line)
-    return 0 if calibration_line.nil? || calibration_line.empty?
+    return 0 if calibration_line.empty?
 
     readings = extract_digits_from_line(calibration_line)
 
-    return 0 unless readings
+    return 0 if readings.empty?
+    return (readings.last.to_i * 10) + readings.last.to_i if readings.length == 1
 
-    if readings.first && readings.last
-      (readings.first.to_i * 10) + readings.last.to_i
-    elsif readings.last.nil?
-      (readings.first.to_i * 10) + readings.last.to_i
-    else
-      0
-    end
+    (readings.first.to_i * 10) + readings.last.to_i
   end
 
   sig { params(line: String).returns(Integer) }
@@ -89,7 +84,7 @@ module CalibrationDocument
     if first_digit && last_digit
       (first_digit[:digit].to_i * 10) + last_digit[:digit].to_i
     elsif last_digit.nil?
-      (first_digit[:digit].to_i * 10) + first_digit[:digit].to_i
+      (T.must(first_digit)[:digit].to_i * 10) + T.must(first_digit)[:digit].to_i
     else
       0
     end
