@@ -84,6 +84,7 @@ DEPENDENCIES
   rubocop-rspec
   rubocop-sorbet
   sorbet
+  sorbet-runtime
   tapioca
 
 BUNDLED WITH

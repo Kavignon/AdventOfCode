@@ -7,6 +7,8 @@ source 'https://rubygems.org'
 # Sorbet gem
 gem 'sorbet', require: false
 
+gem 'sorbet-runtime', require: false
+
 group :development, :test do
   gem 'tapioca', require: false
 end
