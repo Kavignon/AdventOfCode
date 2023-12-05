@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 # typed: true
 
-require "sorbet-runtime"
+require 'sorbet-runtime'
 
 # Represents a measurement in a calibration document.
 class CalibrationReading
@@ -25,15 +25,20 @@ end
 module CalibrationDocument
   extend T::Sig
 
-  NUMBER_WORDS = T.let(
-    {
-      'one' => 1, 'two' => 2, 'three' => 3, 'four' => 4, 'five' => 5,
-      'six' => 6, 'seven' => 7, 'eight' => 8, 'nine' => 9
-    }.freeze,
+  DIGIT_AS_WORDS = T.let(
+    %w[zero one two three four five six seven eight nine].freeze,
+    T::Array[String]
+  )
+
+  # Using a signature to specify the type of the block parameters
+  WORD_TO_DIGIT = T.let(
+    DIGIT_AS_WORDS.map.with_index { |word, index| [word, index] }.to_h.freeze,
     T::Hash[String, Integer]
   )
 
   MAX_WORD_LENGTH_0_TO_9 = T.let(5, Integer)
+  DIGIT_AS_WORD_STR_RANGE = T.let((1..MAX_WORD_LENGTH_0_TO_9), T::Range[Integer])
+  IS_DIGIT_REGEX = T.let(/\d/, Regexp)
 
   sig { params(file_path: String).returns(Integer) }
   def self.launcher_calibration_value(file_path)
@@ -48,8 +53,8 @@ module CalibrationDocument
 
     case readings.size
     when 0 then 0
-    when 1 then readings.first.digit * 11
-    else (readings.first.digit.to_s + readings.last.digit.to_s).to_i
+    when 1 then T.must(readings.first).digit * 11
+    else (T.must(readings.first).digit.to_s + T.must(readings.last).digit.to_s).to_i
     end
   end
 
@@ -58,13 +63,13 @@ module CalibrationDocument
     readings = []
 
     line.each_char.with_index do |char, i|
-      if char.match?(/\d/)
+      if char.match?(IS_DIGIT_REGEX)
         readings << CalibrationReading.new(i, char.to_i)
       else
-        (1..MAX_WORD_LENGTH_0_TO_9).each do |len|
+        DIGIT_AS_WORD_STR_RANGE.each do |len|
           window = line[i, len]
-          spelled_out_number = window.downcase
-          digit = NUMBER_WORDS[spelled_out_number]
+          spelled_out_number = T.must(window).downcase
+          digit = WORD_TO_DIGIT[spelled_out_number]
           readings << CalibrationReading.new(i, digit) if digit
         end
       end
