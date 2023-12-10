@@ -4,6 +4,61 @@
 require 'sorbet-runtime'
 
 Schematics = T.type_alias { T::Array[T::Array[T.nilable(T.any(Integer, String))]] }
+EngineLineSymbolCache = T.type_alias { T::Hash[RowIndex, T::Array[EngineLineSymbol]] }
+
+# Define RowIndex as a struct
+class RowIndex < T::Struct
+  extend T::Sig
+
+  const :value, Integer
+
+  sig { params(other: ColumnIndex).returns(T::Boolean) }
+  def less_than?(other)
+    value < other.value
+  end
+
+  def between?(lower, upper)
+    value.between?(lower, upper)
+  end
+
+  sig { params(other: Integer).returns(RowIndex) }
+  def +(other)
+    RowIndex.new(value: value + other)
+  end
+
+  # Override the == method to compare values
+  sig { params(other: Object).returns(T::Boolean) }
+  def ==(other)
+    other.is_a?(RowIndex) && value == other.value
+  end
+end
+
+# Define ColumnIndex as a struct
+class ColumnIndex < T::Struct
+  extend T::Sig
+
+  const :value, Integer
+
+  sig { params(other: T.any(ColumnIndex, Integer)).returns(T::Boolean) }
+  def less_than?(other)
+    other.is_a?(ColumnIndex) ? value < other.value : value < other
+  end
+
+  def between?(lower, upper)
+    value.between?(lower, upper)
+  end
+
+  sig { params(other: Integer).returns(ColumnIndex) }
+  def +(other)
+    ColumnIndex.new(value: value + other)
+  end
+
+  # Override the == method to compare values
+  sig { params(other: Object).returns(T::Boolean) }
+  def ==(other)
+    other.is_a?(ColumnIndex) && value == other.value
+  end
+end
 
 class String
   def i?
@@ -11,15 +66,57 @@ class String
   end
 end
 
+# Represents an encountered symbol within a line of an engine schematics plan.
+class EngineLineSymbol
+  extend T::Sig
+
+  attr_reader :character, :occurrence_id
+
+  sig { params(symbol_character: String, column_index: ColumnIndex).void}
+  def initialize(symbol_character, column_index)
+    @character = symbol_character
+    @occurrence_id = column_index
+  end
+end
+
 # Represents the plan of the engine.
 class EngineSchematics
   extend T::Sig
 
-  attr_reader :plan
+  ADJACENT_POSITIONS = T.let([
+    [-1, 0], [1, 0], [0, -1], [0, 1], # Above, below, left, right
+    [-1, -1], [-1, 1], [1, -1], [1, 1] # Diagonal positions
+  ].freeze, T::Array[T::Array[Integer]])
+
+  attr_reader :engine_grid, :engine_cache
 
   sig { params(engine_plan_str: String).void }
   def initialize(engine_plan_str)
-    @plan = parse_plan(engine_plan_str)
+    @engine_grid = parse_plan(engine_plan_str)
+    @engine_cache = extract_symbols_from_grid(engine_plan_str).reject { |_, symbols| symbols.empty? }
+  end
+
+  # Checks if a digit is adjacent to a symbol in the engine schematics.
+  sig { params(row: RowIndex, col: ColumnIndex).returns(T::Boolean) }
+  def digit_adjacent_to_symbol?(row, col)
+    ADJACENT_POSITIONS.any? do |r_offset, c_offset|
+      updated_r = row + r_offset
+      updated_c = col + c_offset
+
+      next false unless valid_position?(updated_r, updated_c)
+      next if updated_r == row && updated_c == col
+
+      engine_character = engine_grid[updated_r.value][updated_c.value]
+
+      return true if engine_character != '.' && !engine_character.i?
+    end
+
+    false
+  end
+
+  sig { params(row: RowIndex, col: ColumnIndex).returns(T::Boolean) }
+  def next_char_digit?(row, col)
+    col.less_than?(@engine_grid[row.value].length) && @engine_grid[row.value][col.value].i?
   end
 
   private
@@ -30,19 +127,31 @@ class EngineSchematics
 
     str_grid.lines.map { |line| line.chomp.chars }
   end
+
+  sig { params(str_grid: String).returns(EngineLineSymbolCache) }
+  def extract_symbols_from_grid(str_grid)
+    cache = {}
+    str_grid.lines.each_with_index do |schematic_line, row_index|
+      cache[row_index] ||= []
+      schematic_line.each_char.with_index do |engine_char, col_index|
+        next if engine_char.i? || engine_char == '.'
+
+        cache[row_index] << EngineLineSymbol.new(engine_char, ColumnIndex.new(value: col_index))
+      end
+    end
+
+    cache
+  end
+
+  sig { params(row: RowIndex, col: ColumnIndex).returns(T::Boolean) }
+  def valid_position?(row, col)
+    row.between?(0, engine_grid.length - 1) && col.between?(0, engine_grid[0].length - 1)
+  end
 end
 
 # Handles processing the file containing the schematic engine plan.
 module SchematicEngineSolver
   extend T::Sig
-
-  SYMBOL_REGEX = T.let(/[[:punct:].]+/, Regexp)
-
-  ADJACENT_POSITIONS =
-    T.let([
-      [0, -1], [1, 0], [0, -1], [0, 1], # Above, below, left, right
-      [-1, -1], [-1, 1], [1, -1], [1, 1] # Diagonal positions
-    ].freeze, T::Array[T::Array[Integer]])
 
   sig { params(file_path: String).returns(Integer) }
   def self.find_missing_engine_piece(file_path)
@@ -59,11 +168,12 @@ module SchematicEngineSolver
   def self.missing_part_number(engine_schematics)
     engine_plan_parts = []
 
-    engine_schematics.plan.each_with_index do |row, row_index|
-      col_index = 0
+    engine_schematics.engine_grid.each_with_index do |schematics_line, row_index|
+      col_index = ColumnIndex.new(value: 0)
+      row_index = RowIndex.new(value: row_index)
 
-      while col_index < row.length
-        engine_part_number, col_index = try_extract_engine_part_number(engine_schematics.plan, row_index, col_index)
+      while col_index.less_than?(schematics_line.length)
+        engine_part_number, col_index = try_extract_engine_part_number(engine_schematics, row_index, col_index)
         engine_plan_parts << engine_part_number unless engine_part_number.nil?
       end
     end
@@ -72,78 +182,28 @@ module SchematicEngineSolver
   end
 
   sig do
-    params(engine_schematics: Schematics, row_index: Integer, col_index: Integer).returns([T.nilable(Integer), Integer])
+    params(engine_schematics: EngineSchematics, row_index: RowIndex,
+           col_index: ColumnIndex).returns([T.nilable(Integer), ColumnIndex])
   end
   def self.try_extract_engine_part_number(engine_schematics, row_index, col_index)
-    current_value = engine_schematics[row_index][col_index]
-    next_to_symbol = number_adjacent_to_symbol?(engine_schematics, row_index, col_index)
+    engine_grid = engine_schematics.engine_grid
+    engine_character = engine_grid[row_index.value][col_index.value]
+    next_to_symbol = engine_schematics.digit_adjacent_to_symbol?(row_index, col_index)
 
-    if digit?(current_value)
+    if engine_character.i?
       next_col = col_index + 1
-      engine_part_number = current_value.to_i
+      engine_part_number = engine_character
 
-      while next_char_is_digit?(engine_schematics, row_index, next_col)
-        engine_part_number = engine_part_number * 10 + engine_schematics[row_index][next_col].to_i
-        next_to_symbol ||= number_adjacent_to_symbol?(engine_schematics, row_index, next_col)
+      while engine_schematics.next_char_digit?(row_index, next_col)
+        engine_part_number << engine_grid[row_index.value][next_col.value]
+        next_to_symbol ||= engine_schematics.digit_adjacent_to_symbol?(row_index, next_col)
         next_col += 1
       end
 
-      next_to_symbol ? [engine_part_number, next_col] : [nil, next_col]
+      next_to_symbol ? [engine_part_number.to_i, next_col] : [nil, next_col]
     else
       [nil, col_index + 1]
     end
-  end
-
-  # Checks if a number is adjacent to a symbol in the engine schematics.
-  sig { params(engine_schematics: Schematics, row: Integer, col: Integer).returns(T::Boolean) }
-  def self.number_adjacent_to_symbol?(engine_schematics, row, col)
-    ADJACENT_POSITIONS.any? do |r_offset, c_offset|
-      r = row + r_offset
-      c = col + c_offset
-
-      next false unless valid_position_and_symbol?(engine_schematics, r, c)
-
-      engine_symbol?(engine_schematics[r][c])
-    end
-  end
-
-  sig { params(engine_schematics: Schematics, row: Integer, col: Integer).returns(T::Boolean) }
-  def self.valid_position_and_symbol?(engine_schematics, row, col)
-    row.between?(0, engine_schematics.length - 1) &&
-      col.between?(0, engine_schematics[0].length - 1) &&
-      engine_symbol?(engine_schematics[row][col])
-  end
-
-  sig { params(engine_schematics: Schematics, row: Integer, col: Integer).returns(T::Boolean) }
-  def self.next_char_is_digit?(engine_schematics, row, col)
-    col < engine_schematics[row].length &&
-      engine_schematics[row][col].i?
-  end
-
-  sig { params(engine_schematics: Schematics, row: Integer, col: Integer).returns(T::Boolean) }
-  def self.digit_adjacent_to_symbol?(engine_schematics, row, col)
-    ADJACENT_POSITIONS.any? do |r_offset, c_offset|
-      r = row + r_offset
-      c = col + c_offset
-
-      next false unless r.between?(0, engine_schematics.length - 1) && c.between?(0, engine_schematics[0].length - 1)
-
-      return true if engine_schematics[r][c].is_a?(String) && engine_symbol?(engine_schematics[r][c])
-    end
-
-    false
-  end
-
-  sig { params(engine_character: T.nilable(String)).returns(T::Boolean) }
-  def self.digit?(engine_character)
-    engine_character.i?
-  end
-
-  sig { params(engine_character: T.nilable(String)).returns(T::Boolean) }
-  def self.engine_symbol?(engine_character)
-    return false if engine_character.nil?
-
-    engine_character.match?(SYMBOL_REGEX)
   end
 end
 
