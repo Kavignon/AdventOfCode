@@ -103,15 +103,17 @@ class EngineSchematics
       updated_r = row + r_offset
       updated_c = col + c_offset
 
-      next false unless valid_position?(updated_r, updated_c)
+      next false unless position_within_bounds?(updated_r, updated_c)
       next if updated_r == row && updated_c == col
-
-      engine_character = engine_grid[updated_r.value][updated_c.value]
-
-      return true if engine_character != '.' && !engine_character.i?
+      return true if engine_character_symbol?(engine_grid[updated_r.value][updated_c.value])
     end
 
     false
+  end
+
+  sig { params(engine_character: String).returns(T::Boolean) }
+  def engine_character_symbol?(engine_character)
+    engine_character != '.' && !engine_character.i?
   end
 
   sig { params(row: RowIndex, col: ColumnIndex).returns(T::Boolean) }
@@ -123,7 +125,7 @@ class EngineSchematics
 
   sig { params(str_grid: String).returns(Schematics) }
   def parse_plan(str_grid)
-    raise StandardError, 'the grid is missing' if str_grid.nil? || str_grid.empty?
+    raise StandardError, 'the grid is missing or empty.' if str_grid.nil? || str_grid.empty?
 
     str_grid.lines.map { |line| line.chomp.chars }
   end
@@ -134,7 +136,7 @@ class EngineSchematics
     str_grid.lines.each_with_index do |schematic_line, row_index|
       cache[row_index] ||= []
       schematic_line.each_char.with_index do |engine_char, col_index|
-        next if engine_char.i? || engine_char == '.'
+        next unless engine_character_symbol?(engine_char)
 
         cache[row_index] << EngineLineSymbol.new(engine_char, ColumnIndex.new(value: col_index))
       end
@@ -144,7 +146,7 @@ class EngineSchematics
   end
 
   sig { params(row: RowIndex, col: ColumnIndex).returns(T::Boolean) }
-  def valid_position?(row, col)
+  def position_within_bounds?(row, col)
     row.between?(0, engine_grid.length - 1) && col.between?(0, engine_grid[0].length - 1)
   end
 end
@@ -174,7 +176,7 @@ module SchematicEngineSolver
 
       while col_index.less_than?(schematics_line.length)
         engine_part_number, col_index = try_extract_engine_part_number(engine_schematics, row_index, col_index)
-        engine_plan_parts << engine_part_number unless engine_part_number.nil?
+        engine_plan_parts << T.must(engine_part_number) unless engine_part_number.nil?
       end
     end
 
